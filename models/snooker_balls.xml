@@ -1,0 +1,92 @@
+<mujoco>
+  <worldbody>
+    <body name="cue_ball" pos="3.0 0 4" gravcomp="1">
+      <freejoint name="cue_ball_free" />
+      <geom name="cue_ball_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".66 .65 .60 1" />
+    </body>
+    <body name="object_ball_1" pos="3.15 0 4" gravcomp="1">
+      <freejoint name="object_ball_1_free" />
+      <geom name="object_ball_1_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_2" pos="3.3 0 4" gravcomp="1">
+      <freejoint name="object_ball_2_free" />
+      <geom name="object_ball_2_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_3" pos="3.45 0 4" gravcomp="1">
+      <freejoint name="object_ball_3_free" />
+      <geom name="object_ball_3_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_4" pos="3.6 0 4" gravcomp="1">
+      <freejoint name="object_ball_4_free" />
+      <geom name="object_ball_4_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_5" pos="3.75 0 4" gravcomp="1">
+      <freejoint name="object_ball_5_free" />
+      <geom name="object_ball_5_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_6" pos="3.9 0 4" gravcomp="1">
+      <freejoint name="object_ball_6_free" />
+      <geom name="object_ball_6_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_7" pos="4.05 0 4" gravcomp="1">
+      <freejoint name="object_ball_7_free" />
+      <geom name="object_ball_7_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_8" pos="4.2 0 4" gravcomp="1">
+      <freejoint name="object_ball_8_free" />
+      <geom name="object_ball_8_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_9" pos="4.35 0 4" gravcomp="1">
+      <freejoint name="object_ball_9_free" />
+      <geom name="object_ball_9_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_10" pos="4.5 0 4" gravcomp="1">
+      <freejoint name="object_ball_10_free" />
+      <geom name="object_ball_10_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_11" pos="4.65 0 4" gravcomp="1">
+      <freejoint name="object_ball_11_free" />
+      <geom name="object_ball_11_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_12" pos="4.8 0 4" gravcomp="1">
+      <freejoint name="object_ball_12_free" />
+      <geom name="object_ball_12_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_13" pos="4.95 0 4" gravcomp="1">
+      <freejoint name="object_ball_13_free" />
+      <geom name="object_ball_13_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_14" pos="5.1 0 4" gravcomp="1">
+      <freejoint name="object_ball_14_free" />
+      <geom name="object_ball_14_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_15" pos="5.25 0 4" gravcomp="1">
+      <freejoint name="object_ball_15_free" />
+      <geom name="object_ball_15_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".35 .004 .008 1" />
+    </body>
+    <body name="object_ball_16" pos="5.4 0 4" gravcomp="1">
+      <freejoint name="object_ball_16_free" />
+      <geom name="object_ball_16_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".52 .43 .010 1" />
+    </body>
+    <body name="object_ball_17" pos="5.55 0 4" gravcomp="1">
+      <freejoint name="object_ball_17_free" />
+      <geom name="object_ball_17_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".014 .18 .045 1" />
+    </body>
+    <body name="object_ball_18" pos="5.699999999999999 0 4" gravcomp="1">
+      <freejoint name="object_ball_18_free" />
+      <geom name="object_ball_18_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".17 .056 .013 1" />
+    </body>
+    <body name="object_ball_19" pos="5.85 0 4" gravcomp="1">
+      <freejoint name="object_ball_19_free" />
+      <geom name="object_ball_19_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".013 .065 .35 1" />
+    </body>
+    <body name="object_ball_20" pos="6.0 0 4" gravcomp="1">
+      <freejoint name="object_ball_20_free" />
+      <geom name="object_ball_20_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".50 .14 .25 1" />
+    </body>
+    <body name="object_ball_21" pos="6.15 0 4" gravcomp="1">
+      <freejoint name="object_ball_21_free" />
+      <geom name="object_ball_21_geom" class="snooker_ball" material="snooker_ball_finish" rgba=".005 .005 .006 1" />
+    </body>
+  </worldbody>
+</mujoco>

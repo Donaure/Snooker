@@ -1,0 +1,4 @@
+# Optional tools for students implementing an RL training wrapper.
+-r requirements.txt
+gymnasium>=1.0
+stable-baselines3>=2.3

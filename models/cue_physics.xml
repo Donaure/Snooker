@@ -1,0 +1,55 @@
+<mujoco>
+  <asset>
+    <material name="dynamic_cue_wood_mat" rgba="0.72 0.43 0.20 1"/>
+    <material name="dynamic_cue_tip_mat" rgba="0.03 0.03 0.028 1"/>
+    <texture name="sketchfab_cue_texture" type="2d" file="../assets/cue/sketchfab_pool_table_traditional/cue_mat_baseColor.png"/>
+    <material name="sketchfab_cue_mat" texture="sketchfab_cue_texture" rgba="1 1 1 1" reflectance="0.08"/>
+    <mesh name="sketchfab_cue_visual" file="../assets/cue/sketchfab_pool_table_traditional/snooker_cue_shaft_visual.obj"/>
+  </asset>
+
+  <worldbody>
+    <body name="cue_body" pos="0 -1.3996 1.0785" quat="0.7071067812 0 0 0.7071067812">
+      <!-- Cue local +X points from butt to tip. Left hand site is closer to
+           the cue ball; right hand site is farther back for the power stroke. -->
+      <freejoint name="cue_free"/>
+      <geom name="cue_visual_mesh" type="mesh" mesh="sketchfab_cue_visual"
+            material="sketchfab_cue_mat" contype="0" conaffinity="0" density="0"/>
+      <!-- Visual ferrule covers the rear tip cap. Its mass and clearance are
+           represented by the front shaft; it adds neither mass nor contacts. -->
+      <geom name="cue_ferrule_visual" type="cylinder" fromto="0.710 0 0 0.72475 0 0" size="0.00475"
+            rgba="0.72 0.60 0.30 1" contype="0" conaffinity="0" density="0"/>
+      <!-- Stepped taper for clearance and inertia: 29, 22, 16, 12, 9.5 mm.
+           All shaft segments are enabled in the private clearance probe.
+           Total cue mass remains 530 g; only 0.5 g belongs to the tip. -->
+      <geom name="cue_shaft_butt" type="capsule" fromto="-0.7105 0 0 -0.30 0 0" size="0.0145"
+            mass="0.28" material="dynamic_cue_wood_mat" rgba="0.72 0.43 0.20 0"
+            contype="0" conaffinity="0" condim="3" friction="0 0 0"/>
+      <geom name="cue_shaft_lower" type="capsule" fromto="-0.30 0 0 0.10 0 0" size="0.011"
+            mass="0.15" material="dynamic_cue_wood_mat" rgba="0.72 0.43 0.20 0"
+            contype="0" conaffinity="0" condim="3" friction="0 0 0"/>
+      <geom name="cue_shaft_middle" type="capsule" fromto="0.10 0 0 0.40 0 0" size="0.008"
+            mass="0.065" material="dynamic_cue_wood_mat" rgba="0.72 0.43 0.20 0"
+            contype="0" conaffinity="0" condim="3" friction="0 0 0"/>
+      <geom name="cue_shaft_upper" type="capsule" fromto="0.40 0 0 0.60 0 0" size="0.006"
+            mass="0.025" material="dynamic_cue_wood_mat" rgba="0.72 0.43 0.20 0"
+            contype="0" conaffinity="0" condim="3" friction="0 0 0"/>
+      <geom name="cue_shaft" type="capsule" fromto="0.60 0 0 0.720 0 0" size="0.00475"
+            mass="0.0095" material="dynamic_cue_wood_mat" rgba="0.72 0.43 0.20 0"
+            contype="0" conaffinity="0" condim="3"
+            friction="0 0 0"/>
+      <!-- 9.5 mm diameter rounded contact proxy. The rear cap overlaps the
+           shaft; its front extends 5 mm beyond the shaft envelope. The front
+           cap centre stays at x=0.725 for the fixed-contact stroke planner. -->
+      <geom name="cue_tip" type="capsule" fromto="0.72475 0 0 0.725 0 0" size="0.00475"
+            mass="0.0005" material="dynamic_cue_tip_mat"
+            contype="1" conaffinity="1" condim="6" priority="3"
+            friction="0.35 0.008 0.0001" solref="-5e6 -300"
+            solimp="0.95 0.99 0.001"/>
+      <site name="cue_tip_site" pos="0.725 0 0" size="0.006" rgba="0 1 0 1"/>
+      <site name="cue_axis_site" pos="0 0 0" size="0.004" rgba="0 0.4 1 1"/>
+      <site name="cue_left_grip_site" pos="0.150333 0 0" size="0.015" rgba="0.1 0.8 1 1"/>
+      <site name="cue_right_grip_site" pos="-0.349667 0 0" size="0.015" rgba="1 0.35 0.1 1"/>
+      <site name="cue_back_site" pos="-0.725 0 0" size="0.010" rgba="1 1 0 1"/>
+    </body>
+  </worldbody>
+</mujoco>

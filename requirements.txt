@@ -1,0 +1,8 @@
+# Runtime, rendering and physics diagnostics for the standalone course scene.
+mujoco>=3.12.1
+numpy>=1.24
+imageio>=2.20
+imageio-ffmpeg>=0.4
+opencv-python>=4.8
+Pillow>=9
+matplotlib>=3.5
