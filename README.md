@@ -64,20 +64,6 @@ MUJOCO_GL=egl python scripts/render/render_snooker_diagnostics.py --images-only
 
 诊断渲染展示球台环境。
 
-## 更新文档
-
-修改 `docs/index.md` 或 `docs/snooker.md` 后，在仓库根目录构建并预览：
-
-```bash
-python -m pip install -r docs/requirements.txt
-python docs/build.py
-python -m http.server 8000 --directory outputs/docs/html
-```
-
-浏览器打开 <http://localhost:8000>。文档构建无需安装 MuJoCo 等运行依赖。
-新增页面放在 `docs/` 下，并加入 `docs/index.md` 的 `toctree`。提交并推送文档及配置后，
-在 Read the Docs 中确认对应分支的构建成功；未自动触发时可手动启动构建。
-
 ## 目录说明
 
 
