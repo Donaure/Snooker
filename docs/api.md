@@ -1,5 +1,8 @@
 # 接口速查
 
+实现策略前，请阅读[策略需要处理的全部决策情况](snooker.md#策略需要处理的全部决策情况)，
+覆盖普通回合、犯规选择、D 区摆球、自由球、阶段切换、终局和协议处理顺序。
+
 ## Python 入口
 
 从仓库根目录运行自己的 Python 程序时设置 `PYTHONPATH=src`，然后导入：
@@ -38,6 +41,7 @@ with SnookerMatchEnv() as env:
 | `balls` | 固定 22 个球的编号、名称、分值、有效标志与三维位置 |
 | `table` | 球台尺寸、袋口、球半径、彩球点位、D 区参数 |
 | `stage` | `red`、`colour` 或 `clearance` |
+| `phase` | `shot`、`foul_choice`、`initializing` 或 `finished`；摆球与指定还需检查对应字段 |
 | `legal_targets` | 当前可以作为目标的球编号 |
 | `ball_in_hand` | 是否允许在 D 区摆白球 |
 | `free_ball_available` / `nominated_free_ball` | 自由球资格与当前指定 |

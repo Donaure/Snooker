@@ -22,4 +22,4 @@ snooker_calibration
 ```
 
 源码与问题反馈：[Donaure/Snooker](https://github.com/Donaure/Snooker)。
-比赛规则以本项目裁判实现和课程说明为准；详细近似与限制见完整接口文档。
+比赛规则以本项目裁判实现为准。
