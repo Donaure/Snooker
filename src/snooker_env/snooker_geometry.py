@@ -6,6 +6,7 @@ at 1.05 m and lower the displayed floor so the rail is 0.864 m above it.
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import Mapping
 
 import numpy as np
@@ -136,58 +137,167 @@ def snookered_in_hand(positions: Positions, targets: set[int] | frozenset[int]) 
     return all(snookered({**positions, 0: p}, targets) for p in d_positions(positions))
 
 
+def _route_cushions() -> tuple[tuple[float, float], tuple[float, float]]:
+    """Straight nose runs from the asset builder, in the cue-centre rectangle.
+
+    Curved jaws are excluded: they do not obey axis-aligned mirror reflection.
+    Along a straight nose, the contact point and cue centre share the same
+    tangential coordinate, so run endpoints need no extra radius subtraction.
+    Import lazily because table_assets also imports the table dimensions here.
+    """
+    from .snooker_table_assets import CORNER_RUNOUT, MIDDLE_RUNOUT
+    return ((MIDDLE_RUNOUT, TABLE_LENGTH / 2 - CORNER_RUNOUT),
+            (-TABLE_WIDTH / 2 + CORNER_RUNOUT, TABLE_WIDTH / 2 - CORNER_RUNOUT))
+
+
+def _route_ray(cue, balls, targets, angle, max_cushions, bounds, runs) -> bool:
+    """First-contact ray test; no sampling or physics integration inside."""
+    x, y = cue
+    dx, dy = math.cos(angle), math.sin(angle)
+    diameter2 = (2 * BALL_RADIUS)**2
+    for bounce in range(max_cushions + 1):
+        tx = (math.copysign(bounds[0], dx) - x) / dx if abs(dx) > 1e-15 else math.inf
+        ty = (math.copysign(bounds[1], dy) - y) / dy if abs(dy) > 1e-15 else math.inf
+        travel = min(tx, ty)
+        if travel < -1e-10:
+            return False
+        travel = max(0., travel)
+        target_hit = blocker_hit = math.inf
+        for number, bx, by in balls:
+            rx, ry = bx - x, by - y
+            along = rx*dx + ry*dy
+            cross = rx*dy - ry*dx
+            discriminant = diameter2 - cross*cross
+            if discriminant < -1e-14:
+                continue
+            half = math.sqrt(max(0., discriminant))
+            if along + half < 0:
+                continue
+            # Leaving an existing contact is not a new collision. Without this
+            # case, a cue touching a non-target would be trapped in every direction.
+            if along <= 0 and along + half <= 1e-12:
+                continue
+            hit = max(0., along - half)
+            if number in targets:
+                target_hit = min(target_hit, hit)
+            else:
+                blocker_hit = min(blocker_hit, hit)
+        # Simultaneous contact with a non-target is not a legal first contact.
+        if target_hit <= travel + 1e-12 and target_hit < blocker_hit - 1e-12:
+            return True
+        if blocker_hit <= travel + 1e-12 or bounce == max_cushions:
+            return False
+        x, y = x + travel*dx, y + travel*dy
+        if tx <= ty:
+            if not runs[0][0] + 1e-12 < abs(y) < runs[0][1] - 1e-12:
+                return False
+            dx = -dx
+        else:
+            if not runs[1][0] + 1e-12 < x < runs[1][1] - 1e-12:
+                return False
+            dy = -dy
+    return False
+
+
+def _route_events(cue, balls, targets, max_cushions, bounds, runs):
+    """Critical bearings of the unfolded, clipped circle arrangement.
+
+    Tangencies change ray/circle intersections. Target/blocker circle crossings
+    change first-contact order. Circle/rectangle crossings change whether a hit
+    precedes a rebound. Run endpoints/corners change valid rebound sequences.
+    Between successive events the legal-first-contact answer is constant in
+    this ideal model. Full circles can add harmless extra events outside tiles;
+    the folded ray test always clips each segment at its actual cushion.
+    """
+    radius = 2 * BALL_RADIUS
+    points = [(sx*bounds[0], sy*bounds[1]) for sx in (-1, 1) for sy in (-1, 1)]
+    for sign in (-1, 1):
+        points.extend((sign*bounds[0], y) for y in (-runs[0][1], -runs[0][0], *runs[0]))
+        points.extend((x, sign*bounds[1]) for x in runs[1])
+    for _, x, y in balls:
+        for axis in (0, 1):
+            center = (x, y)
+            for sign in (-1, 1):
+                wall = sign*bounds[axis]
+                square = radius**2 - (wall - center[axis])**2
+                if square >= 0:
+                    offset = math.sqrt(square)
+                    for value in (center[1-axis] - offset, center[1-axis] + offset):
+                        points.append((wall, value) if axis == 0 else (value, wall))
+    target_balls = [ball for ball in balls if ball[0] in targets]
+    blockers = [ball for ball in balls if ball[0] not in targets]
+    for _, ax, ay in target_balls:
+        for _, bx, by in blockers:
+            dx, dy = bx - ax, by - ay
+            distance = math.hypot(dx, dy)
+            if 0 < distance <= 2*radius:
+                offset = math.sqrt(max(0., radius**2 - distance**2 / 4)) / distance
+                for sign in (-1, 1):
+                    points.append(((ax+bx)/2 - sign*dy*offset, (ay+by)/2 + sign*dx*offset))
+    events = {0., 2*math.pi}
+    for ix in range(-max_cushions, max_cushions + 1):
+        for iy in range(-max_cushions, max_cushions + 1):
+            if abs(ix) + abs(iy) > max_cushions:
+                continue
+            sx, sy = (-1)**ix, (-1)**iy
+            ox, oy = 2*ix*bounds[0] - cue[0], 2*iy*bounds[1] - cue[1]
+            for x, y in points:
+                events.add(math.atan2(oy + sy*y, ox + sx*x) % (2*math.pi))
+            for _, x, y in balls:
+                rx, ry = ox + sx*x, oy + sy*y
+                distance = math.hypot(rx, ry)
+                heading = math.atan2(ry, rx)
+                if distance >= radius:
+                    spread = math.asin(radius / distance)
+                    events.add((heading - spread) % (2*math.pi))
+                    events.add((heading + spread) % (2*math.pi))
+    return sorted(events)
+
+
+@lru_cache(maxsize=1)
+def _feasible_route_cached(snapshot, targets, max_cushions) -> bool:
+    cue = next((x, y) for n, x, y in snapshot if n == 0)
+    balls = tuple(ball for ball in snapshot if ball[0] != 0)
+    if not targets:
+        return False
+    bounds = (TABLE_WIDTH / 2 - BALL_RADIUS, TABLE_LENGTH / 2 - BALL_RADIUS)
+    if any(abs(cue[axis]) > bounds[axis] + 1e-10 for axis in (0, 1)):
+        return False
+    runs = _route_cushions()
+    # Common unobstructed shots need neither unfolding nor arrangement events.
+    for number, x, y in balls:
+        if number in targets and _route_ray(cue, balls, targets, math.atan2(y-cue[1], x-cue[0]),
+                                           0, bounds, runs):
+            return True
+    # Resolve direct visibility first, then search the full rebound budget.
+    for limit in dict.fromkeys((0, max_cushions)):
+        events = _route_events(cue, balls, targets, limit, bounds, runs)
+        for low, high in zip(events, events[1:]):
+            if _route_ray(cue, balls, targets, (low + high)/2, limit, bounds, runs):
+                return True
+        # Include isolated tangent solutions; simultaneous illegal contacts and
+        # exact jaw transitions are rejected by the same first-contact test.
+        for angle in events[:-1]:
+            if _route_ray(cue, balls, targets, angle, limit, bounds, runs):
+                return True
+    return False
+
+
 def feasible_route(positions: Positions, targets: set[int] | frozenset[int],
                    max_cushions: int = 4) -> bool:
-    """Search direct and reflected cushion routes for the automatic miss referee.
+    """Geometric first-contact search, at most four ideal rebounds by default.
 
-    Deterministic geometric approximation: 17 impact offsets per target and up
-    to four ideal cushion rebounds. A found clear route proves feasibility;
-    absence is not a mathematical proof of impossibility. Hosts may inject a
-    stronger route oracle into SnookerMatchEnv.
+    Sweep critical angular intervals instead of a fixed angular sample grid.
+    Rebounds use straight nose runs shared with table assets; pockets and curved
+    jaws cannot supply mirror rebounds. Speed, spin, cue access and 3D cushion
+    response are outside this model. Cache only the latest exact XY snapshot,
+    target set and rebound budget; consecutive restores reuse that result.
     """
-    cue = np.array(positions[0][:2], dtype=np.float64)
-    bounds = np.array([TABLE_WIDTH / 2 - BALL_RADIUS, TABLE_LENGTH / 2 - BALL_RADIUS])
-    for n in sorted(targets & positions.keys()):
-        target = np.array(positions[n][:2])
-        blockers = [np.array(p[:2]) for k, p in positions.items() if k and k not in targets]
-        distance = np.linalg.norm(target - cue)
-        if distance <= 2 * BALL_RADIUS + 1e-8:
-            return True
-        # Unfold the rectangle; reflected targets correspond to cushion paths.
-        for ix in range(-max_cushions, max_cushions + 1):
-            for iy in range(-max_cushions, max_cushions + 1):
-                if abs(ix) + abs(iy) > max_cushions:
-                    continue
-                mirror = np.array([2*ix*bounds[0] + (-1)**ix * target[0],
-                                   2*iy*bounds[1] + (-1)**iy * target[1]])
-                delta = mirror - cue
-                heading = math.atan2(delta[1], delta[0])
-                spread = math.asin(min(1., 2 * BALL_RADIUS / np.linalg.norm(delta)))
-                for offset in np.linspace(-.98 * spread, .98 * spread, 17):
-                    direction = np.array([math.cos(heading + offset), math.sin(heading + offset)])
-                    start = cue.copy()
-                    for bounce in range(max_cushions + 1):
-                        times = np.divide(np.sign(direction) * bounds - start, direction,
-                                          out=np.full(2, np.inf), where=np.abs(direction) > 1e-12)
-                        axis = int(np.argmin(times))
-                        travel = times[axis]
-                        # Find the first Ball On along this segment.
-                        hit = float('inf')
-                        for t in targets & positions.keys():
-                            rel = np.array(positions[t][:2]) - start
-                            along = float(rel @ direction)
-                            perpendicular2 = float(rel @ rel) - along**2
-                            if perpendicular2 <= (2 * BALL_RADIUS)**2 and along > 0:
-                                hit = min(hit, max(0., along - math.sqrt(max(0., (2 * BALL_RADIUS)**2 - perpendicular2))))
-                        end = start + min(travel, hit) * direction
-                        if not _segment_clear(start, end, blockers):
-                            break
-                        if hit <= travel:
-                            return True
-                        # Gaps in the actual cushions cannot provide a rebound.
-                        if ((axis == 0 and abs(end[1]) < .09)
-                                or abs(end[1 - axis]) > bounds[1 - axis] - .07):
-                            break
-                        start = end
-                        direction[axis] *= -1
-    return False
+    if isinstance(max_cushions, bool) or not isinstance(max_cushions, int) or max_cushions < 0:
+        raise ValueError("max_cushions must be a nonnegative integer")
+    if 0 not in positions:
+        raise ValueError("Supply a cue-ball position for route search")
+    snapshot = tuple(sorted((n, float(p[0]), float(p[1])) for n, p in positions.items()))
+    if not all(math.isfinite(x) and math.isfinite(y) for _, x, y in snapshot):
+        raise ValueError("Route positions must be finite")
+    return _feasible_route_cached(snapshot, frozenset(targets & positions.keys()) - {0}, max_cushions)

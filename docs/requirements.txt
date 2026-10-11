@@ -1,0 +1,4 @@
+# Documentation builds do not require MuJoCo or the runtime dependencies.
+Sphinx==8.1.3
+myst-parser==4.0.1
+sphinx-rtd-theme==3.0.2

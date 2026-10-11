@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+from contextlib import contextmanager
 from dataclasses import asdict
 import math
 import threading
@@ -34,14 +35,22 @@ class SnookerMatchEnv:
     Optional nominations, foul choices and D placement use separate methods.
     Reading or modifying pre-shot choices never restarts the clock. Physics and
     automatic refereeing do not consume a player's budget. Use a context manager.
+    The program host can exclude each player's one-time ready handshake from
+    the decision budget; the player protocol has no pause operation.
+    After shot_limit completed shots (default 500), settle by score; ties draw.
+    Replays count toward the limit, which is checked after points and penalties.
     """
 
     def __init__(self, *, physics: SnookerMatchPhysics | None = None,
                  turn_seconds: float = 120.,
+                 shot_limit: int = 500,
                  route_oracle: Callable[[Positions, frozenset[int]], bool] = feasible_route) -> None:
         self.turn_seconds = _scalar(turn_seconds, "turn_seconds")
         if self.turn_seconds <= 0:
             raise ValueError("turn_seconds must be positive")
+        if isinstance(shot_limit, bool) or not isinstance(shot_limit, int) or shot_limit <= 0:
+            raise ValueError("shot_limit must be a positive integer")
+        self.shot_limit = shot_limit
         self.physics = physics if physics is not None else SnookerPhysics()
         self.route_oracle = route_oracle
         self._lock = threading.RLock()
@@ -93,6 +102,26 @@ class SnookerMatchEnv:
         self.free_ball = None
         self._start_clock()
 
+    @contextmanager
+    def _player_initialization(self, player: str, *, turn_id: int):
+        """Host-only, once per player/frame; exclude startup before state delivery."""
+        with self._lock:
+            self._check_actor(player, turn_id)
+            if player in self._initialized_players:
+                raise RuntimeError('Player initialization already used for this frame')
+            self._initialized_players.add(player)
+            self._initialization_seconds = max(0., self._deadline - time.monotonic())
+            self._initializing_player = player
+            self._cancel_clock()
+        try:
+            yield
+        finally:
+            with self._lock:
+                if self.turn_id == turn_id:
+                    self._initializing_player = None
+                    if not self._closed and not self.terminated:
+                        self._start_clock(self._initialization_seconds)
+
     def reset(self) -> dict:
         with self._lock:
             if self._closed:
@@ -114,6 +143,9 @@ class SnookerMatchEnv:
             self.reason = "break"
             self.last_shot: dict | None = None
             self.shot_count = 0
+            self._initialized_players: set[str] = set()
+            self._initializing_player: str | None = None
+            self._initialization_seconds = 0.
             self.physics.reset(rack_positions())
             self._new_turn()
             return self.get_match_state()
@@ -137,6 +169,7 @@ class SnookerMatchEnv:
             return {
                 "players": list(PLAYERS), "current_player": self.current_player,
                 "turn_id": self.turn_id, "shot_count": self.shot_count,
+                "shot_limit": self.shot_limit,
                 "scores": self.scores.copy(), "current_break": self.current_break,
                 "highest_breaks": self.highest_breaks.copy(),
                 "stage": self.stage, "clearance_ball": self.clearance_ball if self.stage == "clearance" else None,
@@ -145,11 +178,13 @@ class SnookerMatchEnv:
                                                    if 0 in positions and self._targets() else False),
                 "free_ball_available": self.free_ball_available, "nominated_free_ball": self.free_ball,
                 "ball_in_hand": self.ball_in_hand, "foul_options": options,
-                "phase": "finished" if self.terminated else "foul_choice" if options else "shot",
+                "phase": ("finished" if self.terminated else "initializing" if self._initializing_player
+                          else "foul_choice" if options else "shot"),
                 "terminated": self.terminated, "winner": self.winner,
                 "draw": self.terminated and self.winner is None, "reason": self.reason,
                 "turn_seconds": self.turn_seconds,
-                "seconds_remaining": max(0., self._deadline - time.monotonic()) if self._deadline else 0.,
+                "seconds_remaining": (self._initialization_seconds if self._initializing_player else
+                                      max(0., self._deadline - time.monotonic()) if self._deadline else 0.),
                 "balls": [{"number": n, "name": NAMES[n], "value": VALUES[n],
                            "active": n in positions, "position": list(positions[n]) if n in positions else None}
                           for n in range(22)],
@@ -176,6 +211,8 @@ class SnookerMatchEnv:
         self._check_timeout()
         if self._closed or self.terminated:
             raise RuntimeError("Match is closed or finished")
+        if self._initializing_player is not None:
+            raise RuntimeError("Player is initializing; no match actions are available")
         if player != self.current_player:
             raise ValueError("It is not this player's turn")
         if turn_id != self.turn_id:
@@ -321,11 +358,13 @@ class SnookerMatchEnv:
                                  if decision.penalty and not decision.frame_over else None)
             self.reason = ("foul_and_miss" if decision.miss else "foul" if decision.penalty else
                            "continue" if decision.continues else "turn_passed")
-            if decision.frame_over:
+            if decision.frame_over or self.shot_count >= self.shot_limit:
                 self.terminated = True
                 a, b = (self.scores[p] for p in PLAYERS)
                 self.winner = PLAYERS[0] if a > b else PLAYERS[1] if b > a else None
-                self.reason = "draw" if a == b else "frame_complete"
+                self.reason = ("draw" if a == b else "frame_complete") if decision.frame_over else "shot_limit"
+                self.pending_foul = None
+                self._cancel_clock()
             else:
                 if not decision.continues:
                     self.current_player = other_player(player)

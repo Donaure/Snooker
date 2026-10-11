@@ -14,15 +14,8 @@ AGENTS.md
 
 docs/rl_course_project.md
 
-docs/_templates
-docs/en
-docs/api.md
-docs/build.py
-docs/conf.py
-docs/development.md
-docs/getting_started.md
-docs/index.md
-docs/requirements.txt
-docs/snooker_calibration.md
+docs/_build/
 
 assets/table/snooker/README.md
+
+tests/

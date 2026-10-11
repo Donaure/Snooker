@@ -22,12 +22,20 @@ def main() -> None:
     parser.add_argument('--player-0', required=True, help='Program and arguments (no shell expansion)')
     parser.add_argument('--player-1', required=True, help='Program and arguments (no shell expansion)')
     parser.add_argument('--max-shots', type=int, help='Optional diagnostic stop; does not adjudicate a winner')
+    parser.add_argument('--shot-limit', type=int, default=500,
+                        help='Frame shot limit; settle by score, ties draw (default: 500)')
+    parser.add_argument('--startup-seconds', type=float, default=300.,
+                        help='Separate initialization timeout per player (default: 300 seconds)')
     parser.add_argument('--record', type=Path, metavar='DIRECTORY',
                         help='Save match.mp4, match.json and trajectories in a new directory')
     parser.add_argument('--fps', type=int, default=20, help='Recording frames per second (default: 20)')
     args = parser.parse_args()
     if args.fps <= 0:
         parser.error('--fps must be positive')
+    if args.shot_limit <= 0:
+        parser.error('--shot-limit must be positive')
+    if not 0 < args.startup_seconds < float('inf'):
+        parser.error('--startup-seconds must be positive and finite')
     if args.max_shots is not None and args.max_shots < 0:
         parser.error('--max-shots must be nonnegative')
     if args.record is not None:
@@ -35,9 +43,9 @@ def main() -> None:
             args.record.mkdir(parents=True, exist_ok=False)
         except OSError as error:
             parser.error(f'Cannot create recording directory: {error}')
-    players = {'player_0': SnookerProgramPlayer(shlex.split(args.player_0)),
-               'player_1': SnookerProgramPlayer(shlex.split(args.player_1))}
-    with SnookerMatchEnv() as env:
+    players = {'player_0': SnookerProgramPlayer(shlex.split(args.player_0), startup_seconds=args.startup_seconds),
+               'player_1': SnookerProgramPlayer(shlex.split(args.player_1), startup_seconds=args.startup_seconds)}
+    with players['player_0'], players['player_1'], SnookerMatchEnv(shot_limit=args.shot_limit) as env:
         recorder = None
         if args.record is not None:
             from snooker_env.match_recording import MatchRecorder
@@ -62,6 +70,8 @@ def main() -> None:
             if state['terminated']:
                 stop_reason = 'terminated'
         finally:
+            for player in players.values():
+                player.close()
             # Encoding and report I/O must not consume the next player's budget.
             env.close()
             if recorder is not None:
