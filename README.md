@@ -77,4 +77,4 @@ MUJOCO_GL=egl python scripts/render/render_snooker_diagnostics.py --images-only
 | `scripts/assets/`  | 程序化球台与球模型生成                       |
 
 
-入口是 `SnookerMatchEnv`。
+比赛入口是 `SnookerMatchEnv`。
