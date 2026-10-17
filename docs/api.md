@@ -1,7 +1,12 @@
 # 接口速查
 
-实现策略前，请阅读[策略需要处理的全部决策情况](snooker.md#策略需要处理的全部决策情况)，
-覆盖普通回合、犯规选择、D 区摆球、自由球、阶段切换、终局和协议处理顺序。
+实现策略前，请阅读[选手程序需要处理的全部决策情况](snooker.md#选手程序需要处理的全部决策情况)，
+覆盖普通回合、犯规选择、自由球、阶段切换、终局和协议处理顺序。
+
+比赛决策期间，禁止将当前局面在 MuJoCo 中复制或反复恢复，试打多个候选动作后
+根据仿真结果择优出杆；串行或并行执行均不允许。
+允许调用课程环境进行出杆可行性检查：该检查只检测球杆是否会碰到其他球，
+不模拟球的运动，不属于上述禁止的仿真试打。详见[选手程序限制](snooker.md#选手程序限制)。
 
 ## Python 入口
 
@@ -24,7 +29,7 @@ with SnookerMatchEnv() as env:
 | `reset()` | 重置比赛并开始新的计时 |
 | `get_match_state(player=None)` | 返回独立、可 JSON 序列化的公开状态快照 |
 | `submit_shot(player, angle, speed, u=0., v=0., *, turn_id)` | 执行一杆并返回更新状态 |
-| `nominate_colour(player, ball, *, turn_id)` | 在彩球阶段指定目标彩球 |
+| `nominate_colour(player, ball, *, turn_id)` | 在任选彩球阶段指定目标彩球；击球前必须显式指定 |
 | `nominate_free_ball(player, ball, *, turn_id)` | 指定自由球，传入 `None` 放弃指定 |
 | `place_cue_ball(player, x, y, *, turn_id)` | 手中球时在 D 区合法位置摆球 |
 | `choose_foul(player, choice, *, turn_id)` | 从当前 `foul_options` 选择处理方式 |

@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 from contextlib import contextmanager
 from dataclasses import asdict
-import math
+import random
 import threading
 import time
 from typing import Callable, Protocol
@@ -15,7 +15,7 @@ from .snooker_geometry import (
     BALL_RADIUS, BAULK_Y, BREAK_POSITION, COLOURS, D_RADIUS, NAMES, REDS,
     SPOTS, SURFACE_Z, TABLE_LENGTH, TABLE_WIDTH, VALUES, Positions,
     d_positions, feasible_route, in_d, rack_positions, respot_position,
-    snookered, snookered_in_hand,
+    snookered, snookered_in_hand, vacant,
 )
 from .snooker_physics import SnookerPhysics
 from .snooker_rules import PLAYERS, ShotEvents, adjudicate, balls_on, other_player
@@ -133,7 +133,7 @@ class SnookerMatchEnv:
             self.current_break = 0
             self.stage = "red"
             self.clearance_ball = 16
-            self.ball_in_hand = True
+            self.ball_in_hand = False
             self.free_ball_available = False
             self.pending_foul: dict | None = None
             self.nomination: int | None = None
@@ -146,7 +146,16 @@ class SnookerMatchEnv:
             self._initialized_players: set[str] = set()
             self._initializing_player: str | None = None
             self._initialization_seconds = 0.
-            self.physics.reset(rack_positions())
+            positions = rack_positions()
+            # Uniform rejection sampling over the vacant part of the D.
+            while True:
+                x = random.uniform(-D_RADIUS, D_RADIUS)
+                y = random.uniform(BAULK_Y - D_RADIUS, BAULK_Y)
+                cue = (x, y, positions[0][2])
+                if in_d(x, y) and vacant(cue, positions, ignore=0):
+                    positions[0] = cue
+                    break
+            self.physics.reset(positions)
             self._new_turn()
             return self.get_match_state()
 
@@ -278,23 +287,6 @@ class SnookerMatchEnv:
             self._new_turn()
             return self.get_match_state()
 
-    def _infer_colour(self, angle: float, positions: Positions) -> int:
-        """An unobstructed direct aim makes a colour obvious before the stroke."""
-        cue = positions[0]
-        dx, dy = math.cos(angle), math.sin(angle)
-        hits = []
-        for n, p in positions.items():
-            if n == 0:
-                continue
-            x, y = p[0] - cue[0], p[1] - cue[1]
-            along, across = x*dx + y*dy, abs(x*dy - y*dx)
-            if along > 0 and across < 2 * BALL_RADIUS:
-                hits.append((along - math.sqrt((2 * BALL_RADIUS)**2 - across**2), n))
-        hits.sort()
-        if hits and hits[0][1] in COLOURS and (len(hits) == 1 or hits[1][0] - hits[0][0] > 1e-6):
-            return hits[0][1]
-        raise ValueError("Colour target is not obvious; call nominate_colour before submitting")
-
     def submit_shot(self, player: str, angle: float, speed: float,
                     u: float = 0., v: float = 0., *, turn_id: int) -> dict:
         with self._lock:
@@ -306,7 +298,7 @@ class SnookerMatchEnv:
             positions = self.physics.positions()
             nomination = self.nomination
             if self.stage == "colour" and nomination is None:
-                nomination = self._infer_colour(angle, positions)
+                raise ValueError("Call nominate_colour before submitting a shot in the colour stage")
             self._check_actor(player, turn_id)
             unused = max(0., self._deadline - time.monotonic())
             before = {"positions": positions, "stage": self.stage, "clearance_ball": self.clearance_ball,
